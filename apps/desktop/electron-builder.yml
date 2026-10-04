@@ -16,7 +16,7 @@ files:
   - package.json
 publish:
   provider: github
-  owner: engasnm111
+  owner: KrxqskyTuffs
   repo: lnwjud
   releaseType: release
 afterPack: scripts/capture-packaged-runtime-evidence.mjs

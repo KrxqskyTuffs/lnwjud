@@ -83,13 +83,15 @@ describe('cross-platform desktop packaging', () => {
     }
   });
 
-  it('pins Electron 45 alpha.7 and exposes the Windows WER helper in the installed runtime', async () => {
+  it('pins stable Electron 44.5.1 and installs the matching runtime', async () => {
     const desktopPackage = JSON.parse(await readFile(path.join(desktopRoot, 'package.json'), 'utf8')) as {
       devDependencies?: Record<string, string>;
     };
-    expect(desktopPackage.devDependencies?.electron).toBe('45.0.0-alpha.7');
+    expect(desktopPackage.devDependencies?.electron).toBe('44.5.1');
+    const installedVersion = await readFile(path.join(desktopRoot, 'node_modules', 'electron', 'dist', 'version'), 'utf8');
+    expect(installedVersion.trim()).toBe(desktopPackage.devDependencies?.electron);
     if (process.platform === 'win32') {
-      await access(path.join(desktopRoot, 'node_modules', 'electron', 'dist', 'electron_wer.dll'));
+      await access(path.join(desktopRoot, 'node_modules', 'electron', 'dist', 'electron.exe'));
     }
   });
 
