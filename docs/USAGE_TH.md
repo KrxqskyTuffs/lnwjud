@@ -1,10 +1,10 @@
-# คู่มือใช้งาน lnwjud v5.7.4 (ภาษาไทย)
+# คู่มือใช้งาน lnwjud v5.8.6 (ภาษาไทย)
 
 lnwjud คือ cross-platform local AI-agent runtime / MCP gateway สำหรับให้ ChatGPT, Codex และ MCP client อื่นทำงานกับเครื่องของคุณ เช่น อ่าน/ค้น/แก้ไฟล์, Git, รันโปรเซส และเครื่องมือพัฒนาอื่น ๆ โดยงานจริงยังทำบนเครื่องของคุณ ความสามารถ Windows-only เช่น WSL, Registry และ Windows Sandbox จะไม่แสดงเป็นพร้อมใช้งานบน macOS/Linux
 
-คู่มือนี้อัปเดตตาม source `v5.7.4`; public release `v5.7.4` คือรุ่นที่เผยแพร่แล้วบน [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/tag/v5.7.4)
+คู่มือนี้อัปเดตตาม source `v5.8.6`; public release `v5.8.6` คือรุ่นที่เผยแพร่แล้วบน [GitHub Releases](https://github.com/engasnm111/lnwjud/releases/tag/v5.8.6)
 
-> สำหรับผู้ใช้ package ของ lnwjud **ไม่ต้องติดตั้ง Node.js และไม่ต้องดาวน์โหลด `tunnel-client` เอง** ตัว release รวม official OpenAI `tunnel-client v0.0.15` ที่ตรงกับ OS และ architecture ของ target ไว้ให้แล้ว
+> สำหรับผู้ใช้ package ของ lnwjud **ไม่ต้องติดตั้ง Node.js และไม่ต้องดาวน์โหลด `tunnel-client` เอง** ตัว build จาก source `v5.8.1` รวม official OpenAI `tunnel-client v0.0.16` ที่ตรงกับ OS/architecture พร้อม SHA-256/provenance ส่วน release รุ่นก่อนหน้าอาจ bundle เวอร์ชันต่างกัน ให้ยึดหลักฐานของไฟล์ที่ดาวน์โหลดจริง
 
 คู่มือ target ใหม่:
 
@@ -29,7 +29,7 @@ Outlook/COM ยังคงเป็น Windows-only และจะรายง
 สำหรับ v4.11.0 ตัวโปรแกรมแยก compatibility profile ตามระบบ: Windows 10 x64 ใช้ software rendering เป็นค่าเริ่มต้นเพื่อลดปัญหาหน้าจอ Electron/Chromium ค้าง, วาดไม่ครบ หรือบาง control กดไม่ได้บน GPU/driver รุ่นเก่า ส่วน Windows 11 x64 ยังใช้ hardware acceleration ตามปกติ
 
 งานภายในโปรแกรมที่ต้องเรียก PowerShell ใช้ `powershell.exe` ที่มากับ Windows ไม่บังคับให้ติดตั้ง PowerShell 7 และ child process ภายในถูกเปิดแบบซ่อนหน้าต่าง console. ใน v5.4.2 native input bridge รองรับ Windows PowerShell 5.1 โดยตรงทั้งการพิมพ์ข้อความหลายตัวอักษรและการปล่อย modifier ของ hotkey แบบย้อนลำดับพร้อม `finally` cleanup (Issue #114). ระบบยังจำกัด durable background task พร้อมกันไว้ 16 งาน และ managed process พร้อมกันไว้ 24 งาน เพื่อกันกรณีหลายแชทสั่งงานพร้อมกันจนเกิด `conhost.exe` จำนวนมาก/CPU เต็ม
-- public release ล่าสุด `lnwjud-Setup-5.7.4.exe` หรือ `lnwjud-Portable-5.7.4.exe`
+- public release ล่าสุด `lnwjud-Setup-5.8.6.exe` หรือ `lnwjud-Portable-5.8.6.exe`
 - OpenAI Platform tunnel ที่ผูกกับ ChatGPT workspace ที่จะใช้
 - Credential ตามโหมดที่เลือก: **OAuth** เมื่อ provider รองรับ Tunnel provisioning หรือ **Runtime API key** ที่มีสิทธิ์ **Tunnels Read + Use** สำหรับโหมดเดิม/สำรอง
 - อินเทอร์เน็ตขาออก HTTPS สำหรับ Secure MCP Tunnel
@@ -49,7 +49,7 @@ Node.js, pnpm และ Git จำเป็นเฉพาะกรณีพั�
 
 ### แบบแนะนำ: Installer
 
-1. ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.7.4.exe` จาก GitHub Releases
+1. ดาวน์โหลด public release ล่าสุด `lnwjud-Setup-5.8.6.exe` จาก GitHub Releases
 2. ติดตั้งตามปกติ
 3. เปิด **lnwjud Agent Control Center**
 4. เพิ่ม Project/Workspace ที่ต้องการใช้งาน
@@ -57,7 +57,7 @@ Node.js, pnpm และ Git จำเป็นเฉพาะกรณีพั�
 
 ### แบบไม่ต้องติดตั้ง: Portable EXE
 
-1. ดาวน์โหลด public release ล่าสุด `lnwjud-Portable-5.7.4.exe`
+1. ดาวน์โหลด public release ล่าสุด `lnwjud-Portable-5.8.6.exe`
 2. วางไว้ในโฟลเดอร์ที่ต้องการแล้วเปิดไฟล์ได้ทันที ไม่ต้องรัน installer
 3. เพิ่ม Project/Workspace และตั้ง Tunnel เหมือนเวอร์ชันติดตั้ง
 
@@ -165,7 +165,7 @@ OAuth จะเปิดให้กด Sign in เฉพาะเมื่อ p
 
 1. ใส่ Runtime API key แล้วกด **Save key**
 2. ช่อง **tunnel-client (รวมมากับโปรแกรมแล้ว)** ให้ปล่อยว่างไว้
-   - lnwjud จะใช้ official OpenAI `tunnel-client v0.0.15` ที่ bundle ตาม OS/architecture target อัตโนมัติ และจะ fail closed ถ้า packaged runtime ไม่ตรง target หรือหลักฐานตรวจสอบไม่ผ่าน
+   - lnwjud จะใช้ official OpenAI `tunnel-client v0.0.16` ที่ bundle ตาม OS/architecture target อัตโนมัติ และจะ fail closed ถ้า packaged runtime ไม่ตรง target หรือหลักฐานตรวจสอบไม่ผ่าน
    - ปุ่ม Browse / Save override ใช้เฉพาะกรณี troubleshoot หรือต้องการทดสอบ client อื่น
    - เมื่อบันทึก custom override แล้ว path นั้นเป็นตัวเลือกหลัก ถ้าไฟล์หาย lnwjud จะแจ้ง error และ **จะไม่ fallback ไป bundled เองแบบเงียบ ๆ**
    - ถ้าเคยตั้ง override แล้วอยากกลับไปใช้ตัวที่มากับโปรแกรม ให้ล้างช่องแล้วกด **ใช้ตัวที่มากับโปรแกรม / Use bundled** โดยชัดเจน
@@ -296,6 +296,8 @@ Engineering Harness เป็น workflow สำหรับงานเขี�
 6. Requirement ใหม่จะเพิ่ม `userIntentRevision` และทำให้เฉพาะ gate ที่ได้รับผลกระทบเป็น `stale`; งานที่พิสูจน์แล้วและไม่เกี่ยวข้องยังคงอยู่
 7. `finish_goal(completed)` จะถูกบล็อกถ้ายังมี required gate Pending/Running/Failed/Blocked/Stale หรือมี blocking review finding ที่ยังไม่ resolve
 
+ตั้งแต่ source v5.8.5 การ resume Goal เดิมจะ reconcile workflow classification และ gate contract จาก acquired snapshot ภายใต้ Goal lease แม้ policy digest ไม่เปลี่ยน. Gate ที่สัญญาไม่เปลี่ยนจะเก็บ evidence ที่ยังใช้ได้ ส่วน gate ที่เปลี่ยนจะกลับเป็น stale. การตรวจ source, deployment ที่มีอยู่ หรือ release history แบบอ่านอย่างเดียวไม่ใช่คำสั่งให้ deploy หรือ release; ระบุ action ปลายทางแยกให้ชัดเมื่อร้องขอ delivery.
+
 หน้า Settings แสดง Effective policy, เหตุผลที่ Harness inactive, Task kind, Risk, Phase, Next action และ Required checks พร้อมสถานะ **Pending / Running / Passed / Failed / Blocked / Needs re-check**. สี/สถานะ Passed ต้องมาจากหลักฐานจริง ไม่ใช่เพราะมีข้อความสรุปว่า “เสร็จแล้ว”.
 
 **ขอบเขต enforcement ใน v5.7.0:** first-party development routes ถูก guard เชิงกล แต่ `mcp_call` ไป external MCP, Office ทั่วไป, web และ native UI routes ยังเป็น advisory ของ Engineering Harness และยังคงใช้ permission/security control เดิมของ lnwjud. Engineering Harness ไม่ได้เพิ่มสิทธิ์และไม่ข้าม Active Project, Recovery, approval, Full Bypass semantics หรือ rolling `goalLease` ownership fence.
@@ -392,6 +394,19 @@ External MCP/Serena จะถูกปิดเมื่อ idle ตามค่
 
 **หมายเหตุ Agent Swarm:** ต้องเปิดทั้งสวิตช์ Codex delegation และเครื่องมือ `agent_swarm_run` การเปิด Full Bypass หรือการอนุญาต EXECUTE อย่างเดียวไม่ทำให้เครื่องมือที่ปิดไว้ปรากฏขึ้น การดูรายการ/สถานะเป็นการอ่านข้อมูล ส่วนการเริ่มหรือยกเลิก Agent Swarm ยังต้องผ่านการอนุมัติจากเครื่องที่รัน lnwjud
 
+## 13A. ฟีเจอร์ใน source v5.8.0 — Workflows, Doctor และ CSV/XLSX
+
+- **เวิร์กโฟลว์ 6 แบบ:** เลือกโครงการ, รีวิวโค้ด, ตรวจความพร้อม Release, ตรวจการเชื่อมต่อ, ตรวจข้อมูล และสร้างรายงานต้นแบบได้ทั้งภาษาไทย/อังกฤษ ระบบตรวจช่องที่จำเป็นก่อนเตรียมงานและแสดงตำแหน่งที่ต้องแก้ โดย **เตรียมร่างไม่เท่ากับเริ่ม Goal** และไม่สร้าง Scheduled Task อัตโนมัติ
+- **Doctor:** แท็บ Checks/Calls/Results/Resources แสดงข้อมูลที่ระบบวัดหรือพบจริง เช่น Goal และเครื่องมือที่เลือกได้จากรายการ ไม่ต้องจด ID; เลือกทั้งหมดเป็นค่าเริ่มต้น บางข้อมูลอาจแสดง `unknown`/`unavailable` เมื่อระบบยังไม่มีหลักฐาน ห้ามตีความเป็นศูนย์หรือสถานะปกติ
+- **ผลลัพธ์/Recovery:** ดูหลักฐานตาม Goal และ preview การเปลี่ยนแปลงที่มีขอบเขต ก่อนเรียก restore ต้องตรวจ Project, Goal revision, สิทธิ์และ hash ตามจริง ไม่ใช่คำสั่ง Undo ที่ปลอดภัยโดยอัตโนมัติ
+- **CSV/XLSX:** เลือกไฟล์ผ่าน Browse ของระบบเพื่อตรวจโครงสร้าง/ข้อมูล เปรียบเทียบเซลล์ และสร้างรายงาน; ไฟล์ต้นฉบับไม่ถูกเขียนทับเป็นค่าเริ่มต้น ความสามารถ native Office ขึ้นกับ OS, โปรแกรมและ provider ที่ติดตั้ง; ถ้าไม่พร้อมจะแสดง `needs_setup`/`unsupported` ตามจริง
+- **การค้นหาและหน้าจอ:** dropdown/Settings ใช้รูปแบบเดียวกัน, Git เปิดโฟลเดอร์ที่มีการเปลี่ยนแปลงและยังพับได้, Work Log เริ่มที่ทุกโปรเจกต์, การค้นหาจะแสดงสถานะกำลังโหลดเมื่อจำเป็น
+- **การตรวจสอบก่อนเผยแพร่:** ต้องผ่าน release gates ของ commit บน `main` สำหรับ Windows/macOS/Linux, package provenance และ SHA256 พร้อมเปิดไฟล์ติดตั้งทดลองใน host ที่รองรับ; ผล unit tests บนเครื่องหนึ่งไม่ใช่หลักฐานว่า native provider อีกระบบใช้ได้
+
+คู่มือนี้แยก **source v5.8.0** ออกจาก **public release ล่าสุด** ในหัวเอกสารจนกว่า GitHub จะเผยแพร่ artifact ของ v5.8.0 จริง
+
+---
+
 ## 14. Local STDIO สำหรับ Codex/IDE
 
 Secure Tunnel สำหรับ ChatGPT web ใช้ **Desktop HTTP MCP** และ bundled tunnel-client
@@ -427,13 +442,13 @@ corepack pnpm@10.15.0 build
 corepack pnpm@10.15.0 package:windows
 ```
 
-`package:windows`, `package:macos` และ `package:linux` จะเลือกและดาวน์โหลด official OpenAI tunnel-client v0.0.15 สำหรับ **OS/architecture target นั้น** เท่านั้น ตรวจ SHA-256/provenance/version ที่ pin ไว้ แล้ว bundle binary เข้า package อัตโนมัติ ถ้า target tuple ไม่ตรงหรือหลักฐานไม่ผ่าน build จะหยุดทันที End user ที่ใช้ release ไม่ต้องทำขั้นตอนนี้
+`package:windows`, `package:macos` และ `package:linux` จะเลือกและดาวน์โหลด official OpenAI tunnel-client v0.0.16 สำหรับ **OS/architecture target นั้น** เท่านั้น ตรวจ SHA-256/provenance/version ที่ pin ไว้ แล้ว bundle binary เข้า package อัตโนมัติ ถ้า target tuple ไม่ตรงหรือหลักฐานไม่ผ่าน build จะหยุดทันที End user ที่ใช้ release ไม่ต้องทำขั้นตอนนี้
 
 ไฟล์ที่ได้จะอยู่ที่:
 
 ```text
-apps/desktop/dist/installers/lnwjud-Setup-5.7.4.exe
-apps/desktop/dist/installers/lnwjud-Portable-5.7.4.exe
+apps/desktop/dist/installers/lnwjud-Setup-5.8.6.exe
+apps/desktop/dist/installers/lnwjud-Portable-5.8.6.exe
 apps/desktop/dist/installers/latest.yml
 apps/desktop/dist/installers/portable.yml
 ```

@@ -16,7 +16,7 @@ files:
   - package.json
 publish:
   provider: github
-  owner: engasnm111
+  owner: KrxqskyTuffs
   repo: lnwjud
   releaseType: release
 afterPack: scripts/capture-packaged-runtime-evidence.mjs
@@ -140,3 +140,4 @@ nsis:
   include: build/installer.nsh
 portable:
   artifactName: lnwjud-Portable-${version}.${ext}
+  splashImage: build/portable-splash.bmp

@@ -1,6 +1,6 @@
 {
   "name": "@lnwjud/mcp-server",
-  "version": "5.7.4",
+  "version": "5.8.6",
   "private": true,
   "type": "module",
   "exports": {
@@ -23,10 +23,13 @@
     "@lnwjud/search": "workspace:*",
     "@lnwjud/shared": "workspace:*",
     "@modelcontextprotocol/server": "2.0.0",
+    "csv-parse": "7.0.3",
+    "csv-stringify": "6.9.0",
+    "exceljs": "4.4.0",
     "zod": "4.2.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "2.0.0"
+    "@modelcontextprotocol/client": "2.2.0"
   },
   "scripts": {
     "test": "corepack pnpm@10.15.0 --filter @lnwjud/domain build && corepack pnpm@10.15.0 --filter @lnwjud/shared build && corepack pnpm@10.15.0 --filter @lnwjud/process build && corepack pnpm@10.15.0 --filter @lnwjud/capabilities build && corepack pnpm@10.15.0 --filter @lnwjud/extensions build && corepack pnpm@10.15.0 build && vitest run --fileParallelism=false",

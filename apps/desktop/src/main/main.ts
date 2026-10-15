@@ -24,6 +24,19 @@ import {
   type DestructiveDeletePolicy,
   type DoctorReport,
   type ToolCatalogSnapshot,
+  type WorkflowPrepareRequest,
+  type WorkflowTemplate,
+  type WorkflowDraft,
+  type CallHistoryRequest,
+  type CallHistoryPage,
+  type DoctorGoalOption,
+  type TaskResultSummary,
+  type RestoreTaskCheckpointRequest,
+  type RestoreTaskCheckpointResult,
+  type CancelOwnedGoalTaskRequest,
+  type CancelOwnedGoalTaskResult,
+  type ResourceSnapshotRequest,
+  type ResourceSnapshot,
   type GetToolCatalogRequest,
   type GetGitDiffRequest,
   type GetGitDiffResponse,
@@ -78,7 +91,7 @@ import {
   type UpdateStatus,
   type WorkspaceSummary,
 } from '@lnwjud/ipc-contracts';
-import { readSharedActivitySnapshot, startMcpStdio, type EccRuntimeOptions, type HostMutationApprovalRequest } from '@lnwjud/mcp-server';
+import { readSharedActivitySnapshot, startMcpStdio, inspectWorkflowFile, inspectWorkflowProjectVersion, inspectWorkflowGitBranches, generateWorkflowReportMapping, type EccRuntimeOptions, type HostMutationApprovalRequest } from '@lnwjud/mcp-server';
 import { createExplicitKeySecretProtector, DEFAULT_DISPLAY_TIME_ZONE, DEFAULT_MCP_POLL_WAIT_SECONDS, DEFAULT_SHELL_SYNCHRONOUS_WAIT_SECONDS, MAX_CONFIGURABLE_WAIT_SECONDS, MIN_CONFIGURABLE_WAIT_SECONDS, formatDisplayDateTime, formatOffsetIsoTimestamp, normalizeMcpAllowedHostname, resolveLnwjudDataPath, type SecretProtector } from '@lnwjud/shared';
 import { applyPendingSqliteRestoreSync, CheckpointKeyStore, type CheckpointPayloadCipher } from '@lnwjud/storage';
 import { createDesktopRuntime, formatCompleteTargetDetail, formatIncompleteLegacyHistory, writeSerializedLogRows, type DesktopRuntime } from './desktop-services.js';
@@ -96,12 +109,15 @@ import { UpdateCheckScheduler } from './update-check-scheduler.js';
 import {
   configureUpdaterForDistribution,
   configureUpdaterForPlatform,
+  createLinuxAppImageRollback,
+  restoreLinuxAppImageIfMissing,
   currentPortableExecutablePath,
   detectWindowsDistribution,
   detectUpdaterDistribution,
   launchPortableReplacement,
   preparePortableReplacement,
   usesElectronUpdaterInstall,
+  waitsForNativeInstallAcceptance,
 } from './portable-update.js';
 import { platformCompatibilityProfile, supportedHostPlatform } from './platform-compatibility.js';
 import { atomicWrite, type IncidentDesktopMemory, type IncidentReport } from './incident-report.js';
@@ -115,12 +131,14 @@ import { FACTORY_RESET_APPLY_ARG, applyPendingFactoryResetSync, clearFactoryRese
 import { decryptV3WindowsSafeStorageSecretIfPresent } from './checkpoint-key-compat.js';
 import { mutationApprovalDialogOptions } from './mutation-approval.js';
 import { prependBundledRuntimeToolsToPath } from './runtime-tools.js';
+import { parseWorkflowWorkspace, parseWorkflowPrepare, parseCallHistory, parseDoctorGoalsRequest, parseWorkflowGoal, parseResourceSnapshot, parseRestoreTaskCheckpoint, parseCancelOwnedGoalTask } from './workflow-ipc-parser.js';
 import { COPY_COMMANDS, OFFICIAL_URL_TARGETS } from './tool-catalog/remediation-registry.js';
 import { SafeStorageSecretProtector } from './safe-storage-secret-protector.js';
 import { createUnavailableCheckpointCipher, shouldDegradeUnavailableSecureStorage, shouldUseMacos26E2eSecrets, waitForMacosAsyncSafeStorageStartup } from './safe-storage-startup.js';
 import type { ElectronNativeCapabilityApi, NativeDesktopCaptureRequest, NativeDesktopCaptureResult, NativeDialogOptions, NativeDialogResult, NativeDisplayMetadata } from './electron-native-capability-backend.js';
 import { configureLinuxAutostart } from './linux-autostart.js';
 import { InstallActivityCoordinator } from './install-activity.js';
+import { canInstallMacosUpdates } from './macos-update-trust.js';
 
 const ECC_UPSTREAM_VERSION = '2.2.1';
 
@@ -188,6 +206,14 @@ export interface DesktopIpcServices {
   launchManagedBrowser(): Promise<ManagedBrowserStatus>;
   installPdfProvider(): Promise<PdfProviderInstallResult>;
   runDoctor(): Promise<DoctorReport>;
+  listWorkflowTemplates(request: { readonly workspaceId: string }): Promise<readonly WorkflowTemplate[]>;
+  prepareWorkflow(request: WorkflowPrepareRequest): Promise<WorkflowDraft>;
+  getCallHistory(request: CallHistoryRequest): Promise<CallHistoryPage>;
+  getDoctorGoals(request: { readonly workspaceId: string; readonly view?: 'calls' | 'results' }): Promise<readonly DoctorGoalOption[]>;
+  getTaskResult(request: { readonly workspaceId: string; readonly goalId: string }): Promise<TaskResultSummary>;
+  restoreTaskCheckpoint(request: RestoreTaskCheckpointRequest): Promise<RestoreTaskCheckpointResult>;
+  cancelOwnedGoalTask(request: CancelOwnedGoalTaskRequest): Promise<CancelOwnedGoalTaskResult>;
+  getResourceSnapshot(request: ResourceSnapshotRequest): Promise<ResourceSnapshot>;
   getToolCatalog(request: GetToolCatalogRequest): Promise<ToolCatalogSnapshot>;
   recheckToolCatalog(request: RecheckToolCatalogRequest): Promise<{ readonly catalog: ToolCatalogSnapshot; readonly doctor: DoctorReport }>;
   setToolAvailability(request: SetToolAvailabilityRequest): Promise<SetToolAvailabilityResult>;
@@ -367,6 +393,14 @@ const defaultDesktopServices: DesktopIpcServices = {
   configureTunnelProfile: async (): Promise<{ readonly configured: boolean; readonly profilePath: string }> => ({ configured: false, profilePath: '' }),
   launchManagedBrowser: async (): Promise<ManagedBrowserStatus> => ({ ready: false, port: 9222, launched: false }),
   installPdfProvider: async (): Promise<PdfProviderInstallResult> => { throw new Error('PDF provider installer is not configured'); },
+  listWorkflowTemplates: async () => [],
+  prepareWorkflow: async () => { throw new Error('Workflow service not configured'); },
+  getCallHistory: async () => { throw new Error('Call history service not configured'); },
+  getDoctorGoals: async () => [],
+  getTaskResult: async () => { throw new Error('Goal result service not configured'); },
+  restoreTaskCheckpoint: async () => { throw new Error('Goal checkpoint restore not configured'); },
+  cancelOwnedGoalTask: async () => { throw new Error('Owned Goal task cancellation not configured'); },
+  getResourceSnapshot: async () => { throw new Error('Resource service not configured'); },
   runDoctor: async (): Promise<DoctorReport> => ({
     checks: [{ id: 'desktop', required: true, status: 'fail', title: 'Desktop services', summary: 'Desktop services are not configured', affectedToolNames: [], checkedAt: new Date(0).toISOString(), durationMs: 0, message: 'Desktop services are not configured' }],
     exitCode: 1,
@@ -669,6 +703,50 @@ export function registerIpcHandlers(
     assertTrustedSender(event, getMainWindow());
     return services.setGoalPonytailMode(parseSetGoalPonytailModeRequest(payload));
   });
+  registerHandler(ipcChannels.chooseWorkflowDataFile, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    assertNoPayload(payload);
+    const owner = getMainWindow();
+    if (owner === null) return { filePath: null };
+    const result = await dialog.showOpenDialog(owner, {
+      title: 'Select Excel / CSV data file',
+      properties: ['openFile'],
+      filters: [{ name: 'Excel and CSV', extensions: ['xlsx', 'csv'] }, { name: 'JSON mappings', extensions: ['json'] }, { name: 'All files', extensions: ['*'] }],
+    });
+    return { filePath: result.canceled ? null : (result.filePaths[0] ?? null) };
+  });
+  registerHandler(ipcChannels.inspectWorkflowChoices, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Invalid workflow inspection request');
+    const request = payload as Record<string, unknown>;
+    if (typeof request.workspaceId !== 'string' || !request.workspaceId || request.workspaceId.length > 128
+      || Object.keys(request).some((key) => key !== 'workspaceId' && key !== 'filePath')
+      || (request.filePath !== undefined && (typeof request.filePath !== 'string' || request.filePath.length > 4096))) {
+      throw new Error('Invalid workflow inspection request');
+    }
+    const workspace = (await services.listWorkspaces()).find((item) => item.id === request.workspaceId);
+    if (!workspace) throw new Error('Workspace not found');
+    const root = workspace.realRootPath;
+    if (typeof request.filePath === 'string') {
+      return { projectVersion: null, branches: [], file: await inspectWorkflowFile(root, request.filePath) };
+    }
+    const [projectVersion, branches] = await Promise.all([
+      inspectWorkflowProjectVersion(root), inspectWorkflowGitBranches(root),
+    ]);
+    return { projectVersion, branches, file: null };
+  });
+  registerHandler(ipcChannels.generateWorkflowMapping, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Invalid mapping request');
+    const request = payload as Record<string,unknown>;
+    if (typeof request.workspaceId !== 'string' || request.workspaceId.length > 128 || !request.workspaceId
+      || typeof request.templatePath !== 'string' || !request.templatePath || request.templatePath.length > 4096
+      || typeof request.sheet !== 'string' || !request.sheet || request.sheet.length > 31
+      || Object.keys(request).some(key => !['workspaceId','templatePath','sheet'].includes(key))) throw new Error('Invalid mapping request');
+    const workspace = (await services.listWorkspaces()).find(item => item.id === request.workspaceId);
+    if (!workspace) throw new Error('Workspace not found');
+    return {filePath: await generateWorkflowReportMapping(workspace.realRootPath, request.templatePath, request.sheet)};
+  });
   registerHandler(ipcChannels.chooseTunnelClientPath, async (event, payload: unknown) => {
     assertTrustedSender(event, getMainWindow());
     assertNoPayload(payload);
@@ -701,6 +779,38 @@ export function registerIpcHandlers(
     assertTrustedSender(event, getMainWindow());
     assertNoPayload(payload);
     return services.installPdfProvider();
+  });
+  registerHandler(ipcChannels.listWorkflowTemplates, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    return services.listWorkflowTemplates(parseWorkflowWorkspace(payload));
+  });
+  registerHandler(ipcChannels.prepareWorkflow, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    return services.prepareWorkflow(parseWorkflowPrepare(payload));
+  });
+  registerHandler(ipcChannels.getCallHistory, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    return services.getCallHistory(parseCallHistory(payload));
+  });
+  registerHandler(ipcChannels.getDoctorGoals, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    return services.getDoctorGoals(parseDoctorGoalsRequest(payload));
+  });
+  registerHandler(ipcChannels.getTaskResult, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    return services.getTaskResult(parseWorkflowGoal(payload));
+  });
+  registerHandler(ipcChannels.restoreTaskCheckpoint, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    return services.restoreTaskCheckpoint(parseRestoreTaskCheckpoint(payload));
+  });
+  registerHandler(ipcChannels.cancelOwnedGoalTask, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    return services.cancelOwnedGoalTask(parseCancelOwnedGoalTask(payload));
+  });
+  registerHandler(ipcChannels.getResourceSnapshot, async (event, payload: unknown) => {
+    assertTrustedSender(event, getMainWindow());
+    return services.getResourceSnapshot(parseResourceSnapshot(payload));
   });
   registerHandler(ipcChannels.runDoctor, async (event, payload: unknown) => {
     assertTrustedSender(event, getMainWindow());
@@ -1480,6 +1590,7 @@ const windowsDistribution = detectWindowsDistribution(app.isPackaged);
 const updaterDistribution = detectUpdaterDistribution(app.isPackaged, process.platform, process.env);
 const platformCompatibility = platformCompatibilityProfile(process.platform, os.release(), process.arch);
 let pendingPortableUpdate: { readonly version: string; readonly downloadedFile: string } | null = null;
+let pendingLinuxAppImageUpdate: { readonly version: string; readonly downloadedFile: string } | null = null;
 let crashDiagnostics: CrashDiagnosticsRecorder | null = null;
 let desktopSessionDiagnostics: DesktopSessionDiagnostics | null = null;
 let runtimeDiagnosticsHistory: RuntimeDiagnosticsHistoryRecorder | null = null;
@@ -1670,6 +1781,16 @@ function requestUpdateCheck(source: 'automatic' | 'tray' | 'renderer'): UpdateSt
     }
     return status;
   }
+  if (!autoUpdaterInitialized && currentUpdateStatus.phase === 'unavailable') {
+    if (source === 'tray') {
+      void dialog.showMessageBox({
+        type: 'info', title: messages.updaterCheckTitle,
+        message: boundedNativeDialogText(currentUpdateStatus.message ?? messages.updaterUnavailable),
+        buttons: [messages.ok],
+      });
+    }
+    return currentUpdateStatus;
+  }
   if (currentUpdateStatus.phase === 'available') {
     if (source !== 'automatic' && !desktopUserSettings.updateAutoDownload) {
       const status = patchUpdateStatus({
@@ -1761,8 +1882,12 @@ async function requestUpdateInstall(): Promise<{ readonly accepted: boolean; rea
     });
     if (!approved) return { accepted: false, status: currentUpdateStatus };
 
-    const tunnelStopped = await stopTunnelForUpdateInstall(runtime);
-    if (!tunnelStopped) return { accepted: false, status: currentUpdateStatus };
+    // Native macOS/AppImage must validate/install before runtime shutdown.
+    // before-quit closes the owned tunnel once native installation succeeds.
+    if (!waitsForNativeInstallAcceptance(updaterDistribution)) {
+      const tunnelStopped = await stopTunnelForUpdateInstall(runtime);
+      if (!tunnelStopped) return { accepted: false, status: currentUpdateStatus };
+    }
 
     const status = patchUpdateStatus({
       phase: 'installing',
@@ -1992,6 +2117,10 @@ function initAutoUpdater(runtime: DesktopRuntime): void {
     patchUpdateStatus({ phase: 'unavailable', message: nativeMessages(desktopLocale).updaterUnavailablePlatform, canInstall: false });
     return;
   }
+  if (updaterDistribution === 'macos' && !canInstallMacosUpdates(process.execPath)) {
+    patchUpdateStatus({ phase: 'unavailable', message: nativeMessages(desktopLocale).updaterUnavailableMacosUnsigned, canInstall: false });
+    return;
+  }
   try {
     configureUpdaterForDistribution(autoUpdater, windowsDistribution);
     configureUpdaterForPlatform(autoUpdater, updaterDistribution);
@@ -2021,13 +2150,53 @@ function initAutoUpdater(runtime: DesktopRuntime): void {
       },
       maxWaitMs: 5_000,
       install: (): void => {
-        void stopTunnelForUpdateInstall(runtime).then((tunnelStopped) => {
+        const ensureTunnelStopped = waitsForNativeInstallAcceptance(updaterDistribution)
+          ? Promise.resolve(true)
+          : stopTunnelForUpdateInstall(runtime);
+        void ensureTunnelStopped.then((tunnelStopped) => {
           if (!tunnelStopped) return;
           void runtime.createBackup('pre-update').catch((error: unknown) => {
             console.error(`Pre-update backup failed: ${error instanceof Error ? error.message : 'unknown error'}`);
           }).finally(() => {
             if (usesElectronUpdaterInstall(updaterDistribution)) {
-              void desktopShutdownCoordinator?.requestQuit(() => autoUpdater.quitAndInstall(), 'install');
+              if (updaterDistribution === 'macos') {
+                // Squirrel.Mac validates the signature after native checkForUpdates.
+                // Do not enter IPC shutdown before it accepts the replacement.
+                try { autoUpdater.quitAndInstall(); } catch (error: unknown) {
+                  patchUpdateStatus({ phase: 'error', message: error instanceof Error ? error.message : String(error), canInstall: false });
+                }
+              } else if (updaterDistribution === 'linux-appimage') {
+                const downloaded = pendingLinuxAppImageUpdate?.downloadedFile;
+                const installed = process.env.APPIMAGE;
+                if (!downloaded || !installed) {
+                  patchUpdateStatus({ phase: 'error', message: 'Linux AppImage update is missing its current or downloaded file.', canInstall: false });
+                  return;
+                }
+                void createLinuxAppImageRollback(installed, downloaded).then(async ({ currentPath, backupPath }) => {
+                  // electron-updater unlinks the old AppImage before moving the new.
+                  // Its installer is synchronous and emits error for failed moves.
+                  let installError = '';
+                  const onError = (error: Error): void => { installError = error.message; };
+                  autoUpdater.on('error', onError);
+                  try { autoUpdater.quitAndInstall(); } catch (error: unknown) {
+                    installError = error instanceof Error ? error.message : String(error);
+                  } finally {
+                    autoUpdater.off('error', onError);
+                  }
+                  if (installError) {
+                    try {
+                      await restoreLinuxAppImageIfMissing(currentPath, backupPath);
+                    } catch (restoreError: unknown) {
+                      installError += ` (recovery failed: ${restoreError instanceof Error ? restoreError.message : String(restoreError)}; backup: ${backupPath})`;
+                    }
+                    patchUpdateStatus({ phase: 'error', message: installError, canInstall: false });
+                  }
+                }).catch((error: unknown) => {
+                  patchUpdateStatus({ phase: 'error', message: error instanceof Error ? error.message : String(error), canInstall: false });
+                });
+              } else {
+                void desktopShutdownCoordinator?.requestQuit(() => autoUpdater.quitAndInstall(), 'install');
+              }
               return;
             }
             const portableUpdate = pendingPortableUpdate;
@@ -2064,6 +2233,7 @@ function initAutoUpdater(runtime: DesktopRuntime): void {
       const requestedFromTray = pendingUpdateCheckSource === 'tray';
       pendingUpdateCheckSource = null;
       pendingPortableUpdate = null;
+      pendingLinuxAppImageUpdate = null;
       console.log(`[AutoUpdater] Update available: v${info.version}`);
       const messages = nativeMessages(desktopLocale);
       patchUpdateStatus({
@@ -2127,6 +2297,9 @@ function initAutoUpdater(runtime: DesktopRuntime): void {
       recordUpdaterDownload(info.version);
       if (windowsDistribution === 'portable') {
         pendingPortableUpdate = { version: info.version, downloadedFile: info.downloadedFile };
+      }
+      if (updaterDistribution === 'linux-appimage') {
+        pendingLinuxAppImageUpdate = { version: info.version, downloadedFile: info.downloadedFile };
       }
       patchUpdateStatus({
         phase: 'ready',

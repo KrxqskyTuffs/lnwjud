@@ -5,6 +5,15 @@ packages:
 overrides:
   "@electron/osx-sign>isbinaryfile": 5.0.7
   js-yaml: 4.3.2
+  "brace-expansion@<2": 1.1.21
+  "brace-expansion@>=2 <3": 2.1.7
+  "brace-expansion@>=4": 5.0.12
+  "@xmldom/xmldom@<0.9": 0.8.15
+  "@xmldom/xmldom@>=0.9": 0.9.12
+  "undici@>=7 <8": 7.30.0
+  fast-uri: 3.1.8
+  http-cache-semantics: 4.3.0
+  vite: 7.3.6
 
 onlyBuiltDependencies:
   - electron
