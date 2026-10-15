@@ -1042,8 +1042,8 @@ describe('TunnelController lifecycle', () => {
   });
 
   it.runIf(process.platform === 'win32')('uses the injected Windows graceful-stop bound and retains ownership when no child exit is observed', async () => {
-    vi.useFakeTimers();
     const fixture = await ownedController(() => true, 20);
+    vi.useFakeTimers();
     let stoppedWith: unknown;
     const stopping = fixture.controller.stop().catch((error: unknown) => { stoppedWith = error; });
 
@@ -1635,6 +1635,7 @@ async function ownedController(kill: () => boolean, stopTimeoutMs = 2_000, shutd
   inspectOwnedProcess?: (pid: number) => Promise<import('@lnwjud/mcp-server').ProcessProbeResult>;
   inspectOwnedProcessTree?: (rootPid: number) => Promise<readonly { readonly pid: number; readonly processStartedAt: string }[]>;
   escalationTimeoutMs?: number;
+  lockPlatform?: NodeJS.Platform;
 } = {}, lockHooks?: NonNullable<Parameters<typeof acquireTunnelLock>[0]['hooks']>): Promise<{
   controller: TunnelController;
   child: FakeChild;
@@ -1651,7 +1652,8 @@ async function ownedController(kill: () => boolean, stopTimeoutMs = 2_000, shutd
     processStartedAt: '2026-08-20T00:00:00.000Z',
     acquiredAt: '2026-08-20T00:00:00.000Z',
   };
-  const claim = await acquireTunnelLock({ profileDirectory: profileDir, owner: lockOwner, inspectProcess: async () => ({ state: 'live', processStartedAt: lockOwner.processStartedAt }), ...(lockHooks === undefined ? {} : { hooks: lockHooks }) });
+  const { lockPlatform = 'linux', ...controllerOptions } = shutdownOptions;
+  const claim = await acquireTunnelLock({ profileDirectory: profileDir, owner: lockOwner, inspectProcess: async () => ({ state: 'live', processStartedAt: lockOwner.processStartedAt }), platform: lockPlatform, ...(lockHooks === undefined ? {} : { hooks: lockHooks }) });
   if (!claim.acquired) throw new Error('test controller could not acquire its lock');
   const controller = new TunnelController({
     getClientPath: (): string | null => null,
@@ -1665,7 +1667,7 @@ async function ownedController(kill: () => boolean, stopTimeoutMs = 2_000, shutd
       terminateOwnedProcessTree: async (): Promise<void> => { child.kill(); },
     }),
     inspectOwnedProcessTree: async (): Promise<readonly { readonly pid: number; readonly processStartedAt: string }[]> => [],
-    ...shutdownOptions,
+    ...controllerOptions,
   });
   const child = new EventEmitter() as FakeChild;
   child.exitCode = null;

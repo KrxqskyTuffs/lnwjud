@@ -5,10 +5,14 @@ export interface ManagedProcessStart {
   readonly args: readonly string[];
   readonly cwd: string;
   readonly timeoutMs?: number;
+  /** Close stdin for non-interactive CLI children whose prompt was passed via argv. */
+  readonly stdinMode?: 'ignore';
 }
 
 export interface ManagedProcess {
   readonly processId: string;
+  /** Host-owned child PID for read-only resource sampling; never use as an authorization token. */
+  readonly pid?: number;
   readonly executable: string;
   readonly args: readonly string[];
   readonly cwd: string;
