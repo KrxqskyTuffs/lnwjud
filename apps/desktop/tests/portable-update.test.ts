@@ -94,7 +94,8 @@ describe('Windows distribution-aware auto updater', () => {
       const downloaded = path.join(root, 'update.AppImage');
       await writeFile(current, 'old');
       await expect(createLinuxAppImageRollback(current, downloaded)).rejects.toThrow();
-      await symlink(current, downloaded);
+      const linkedTarget = await mkdtemp(path.join(root, 'linked-target-'));
+      await symlink(linkedTarget, downloaded, process.platform === 'win32' ? 'junction' : 'dir');
       await expect(createLinuxAppImageRollback(current, downloaded)).rejects.toThrow('regular files');
     } finally {
       await rm(root, { recursive: true, force: true });
