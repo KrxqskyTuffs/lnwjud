@@ -15,7 +15,7 @@
   "dependencies": {
     "@lnwjud/domain": "workspace:*",
     "@lnwjud/process": "workspace:*",
-    "@modelcontextprotocol/client": "2.0.0"
+    "@modelcontextprotocol/client": "2.2.0"
   },
   "scripts": {
     "test": "vitest run",
